@@ -48,7 +48,7 @@ export function GokuScene({ assets, quality, reducedMotion, onFigureReady }: Pro
       <Ground segments={quality.tier === "low" ? 110 : 220} lowEnd={quality.tier === "low"} />
       <FloatingRocks count={quality.rocks} />
       {useModel ? <WarriorModel onError={onModelError} /> : null}
-      {/* With a model, only the aura renders here, shaped by the procedural silhouette. */}
+      {/* With a model, only the aura renders here, shaped by the drawn figure's silhouette. */}
       <Warrior assets={assets} textureSize={quality.figureTexture} showFigure={!useModel} onReady={onFigureReady} />
       <BodyArcs reducedMotion={reducedMotion} />
       <EnergyParticles count={Math.round(quality.particles * ANIMATION.intensity.particles)} />

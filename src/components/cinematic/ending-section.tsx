@@ -113,7 +113,7 @@ export function EndingSection({ onReplay, reducedMotion }: { onReplay: () => voi
           <div>
             <p className="eyebrow mb-2 text-bone/70">Visuals &amp; sound</p>
             <p>
-              Every image, effect and sound in this build is generated in code: an original silhouette, GLSL shaders and
+              Goku is drawn in code as a fan illustration, and every effect and sound is generated too: GLSL shaders and
               a Web Audio soundscape. No official artwork is included. Licensed media can be dropped in (see README).
             </p>
           </div>

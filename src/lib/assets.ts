@@ -2,7 +2,7 @@
  * Central registry of replaceable media.
  *
  * Every path is relative to `/public`. None of these files ship with the repo:
- * the experience renders an original procedural scene until you drop in media
+ * the experience renders a code-drawn Goku and procedural scenery until you drop in media
  * you own or are licensed to use. `lib/asset-manifest.ts` checks at build time
  * which ones exist, so missing files never produce broken requests.
  *
@@ -50,7 +50,7 @@ export type AssetManifest = Record<AssetKey, boolean>;
  * assumed: missing clips simply aren't played.
  */
 export const MODEL_CONFIG = {
-  /** Height the model is scaled to, in world units (the procedural figure is 2.6). */
+  /** Height the model is scaled to, in world units (the drawn figure is about 2.3). */
   height: 2.6,
   /** Looping idle/power-up clip, if present. Falls back to the first clip. */
   idleClip: "idle",

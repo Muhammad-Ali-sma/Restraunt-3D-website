@@ -1,22 +1,19 @@
 import * as THREE from "three";
-import { FIGURE_SIZE, WARRIOR } from "@/lib/warrior-figure";
+import { FIGURE_SIZE, figureLayers, figureParts, FIGURE_BODY, type Form, type Shape } from "@/lib/goku-figure";
 
 /**
- * Builds the character textures on the client.
- *
- * figure (RGBA8): procedural mode packs four masks (R body, G resting hair,
- *   B golden hair, A rim-catching detail lines). Image mode stores the base
- *   artwork's colour.
- * glow (RGBA8, half resolution): blurred silhouettes used for the rim light
- *   and the aura (R/G tight blur for base/golden, B/A wide blur for base/golden).
+ * Builds the character textures on the client: one colour texture per form
+ * (base, golden, silver), a half-resolution "glow" texture of blurred
+ * silhouettes (R/G tight blur for base/golden, B/A wide blur for base/golden)
+ * used by the rim light and the aura, and, for the drawn figure, an
+ * "emissive" mask of the visible hair (R golden, G silver) so it can shine.
  */
 export type FigureTextures = {
-  mode: "procedural" | "image";
-  figure: THREE.Texture;
-  /** Image mode only: the golden-form artwork and the Ultra Instinct artwork. */
+  base: THREE.Texture;
   superSaiyan?: THREE.Texture;
   ultra?: THREE.Texture;
   glow: THREE.DataTexture;
+  emissive?: THREE.DataTexture;
   dispose: () => void;
 };
 
@@ -29,24 +26,6 @@ function canvas2d(w: number, h: number) {
   const ctx = c.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("2D canvas unavailable");
   return { c, ctx };
-}
-
-/** Rasterises SVG path data into an alpha mask (0–255). */
-function rasterise(width: number, draw: (ctx: CanvasRenderingContext2D) => void) {
-  const height = Math.round(width * ASPECT);
-  const { ctx } = canvas2d(width, height);
-  ctx.scale(width / FIGURE_SIZE.width, width / FIGURE_SIZE.width);
-  ctx.fillStyle = "#fff";
-  ctx.strokeStyle = "#fff";
-  draw(ctx);
-  const data = ctx.getImageData(0, 0, width, height).data;
-  const out = new Uint8ClampedArray(width * height);
-  for (let i = 0; i < out.length; i++) out[i] = data[i * 4 + 3];
-  return out;
-}
-
-function fillPaths(paths: readonly string[]) {
-  return (ctx: CanvasRenderingContext2D) => paths.forEach((d) => ctx.fill(new Path2D(d)));
 }
 
 /** Downsample a mask by 2 (box filter) into floats 0–1. */
@@ -128,49 +107,89 @@ function glowFrom(base: Uint8ClampedArray, ssj: Uint8ClampedArray, w: number, h:
   return dataTexture(data, hw, hh);
 }
 
-export function buildProceduralFigure(width: number): FigureTextures {
+/** Paints figure layers (SVG path data in the 1000-unit frame) onto a canvas. */
+function paint(ctx: CanvasRenderingContext2D, shapes: Shape[], override?: string) {
+  const paths = new Map<string, Path2D>();
+  const path = (d: string) => paths.get(d) ?? paths.set(d, new Path2D(d)).get(d)!;
+  for (const s of shapes) {
+    ctx.save();
+    if (s.clip) ctx.clip(path(s.clip));
+    ctx.globalAlpha = override ? 1 : (s.opacity ?? 1);
+    if (s.fill) {
+      ctx.fillStyle = override ?? s.fill;
+      ctx.fill(path(s.d));
+    }
+    if (s.stroke && s.width) {
+      ctx.strokeStyle = override ?? s.stroke;
+      ctx.lineWidth = s.width;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.stroke(path(s.d));
+    }
+    ctx.restore();
+  }
+}
+
+function alphaOf(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const data = ctx.getImageData(0, 0, w, h).data;
+  const out = new Uint8ClampedArray(w * h);
+  for (let i = 0; i < out.length; i++) out[i] = data[i * 4 + 3];
+  return out;
+}
+
+/** The visible hair of a form: hair in white, everything in front of the back hair punched out. */
+function hairMask(form: Form, width: number) {
   const height = Math.round(width * ASPECT);
-  const body = rasterise(width, fillPaths(WARRIOR.body));
-  const hairBase = rasterise(width, fillPaths(WARRIOR.hairBase));
-  const hairSsj = rasterise(width, fillPaths(WARRIOR.hairSsj));
-  const details = rasterise(width, (ctx) => {
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    for (const { d, w } of WARRIOR.details) {
-      ctx.lineWidth = w;
-      ctx.stroke(new Path2D(d));
-    }
+  const { ctx } = canvas2d(width, height);
+  ctx.scale(width / FIGURE_SIZE.width, width / FIGURE_SIZE.width);
+  const { back, front } = figureParts(form);
+  paint(ctx, back, "#fff");
+  ctx.globalCompositeOperation = "destination-out";
+  paint(
+    ctx,
+    FIGURE_BODY.filter((s) => s.fill),
+    "#000",
+  );
+  ctx.globalCompositeOperation = "source-over";
+  paint(ctx, front, "#fff");
+  return alphaOf(ctx, width, height);
+}
+
+/** Rasterises the drawn Goku: three forms, glow and emissive masks. */
+export function buildIllustratedFigure(width: number): FigureTextures {
+  const height = Math.round(width * ASPECT);
+  const forms = (["base", "ssj", "ultra"] as const).map((form) => {
+    const { c, ctx } = canvas2d(width, height);
+    ctx.scale(width / FIGURE_SIZE.width, width / FIGURE_SIZE.width);
+    paint(ctx, figureLayers(form));
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    return { tex, alpha: alphaOf(ctx, width, height) };
   });
+  const [base, ssj, ultra] = forms;
+  const glow = glowFrom(base.alpha, ssj.alpha, width, height);
 
-  const figData = new Uint8Array(width * height * 4);
-  for (let y = 0; y < height; y++) {
-    const src = y * width;
-    const dst = (height - 1 - y) * width;
-    for (let x = 0; x < width; x++) {
-      const o = (dst + x) * 4;
-      const i = src + x;
-      figData[o] = body[i];
-      figData[o + 1] = hairBase[i];
-      figData[o + 2] = hairSsj[i];
-      figData[o + 3] = details[i];
-    }
-  }
-  const unionBase = new Uint8ClampedArray(body.length);
-  const unionSsj = new Uint8ClampedArray(body.length);
-  for (let i = 0; i < body.length; i++) {
-    unionBase[i] = Math.max(body[i], hairBase[i]);
-    unionSsj[i] = Math.max(body[i], hairSsj[i]);
-  }
+  const hw = width >> 1;
+  const hh = height >> 1;
+  const gold = half(hairMask("ssj", width), width, height);
+  const silver = half(hairMask("ultra", width), width, height);
+  const emissive = dataTexture(
+    packFloat(hw, hh, [gold, silver, new Float32Array(hw * hh), new Float32Array(hw * hh).fill(1)]),
+    hw,
+    hh,
+  );
 
-  const figure = dataTexture(figData, width, height);
-  const glow = glowFrom(unionBase, unionSsj, width, height);
   return {
-    mode: "procedural",
-    figure,
+    base: base.tex,
+    superSaiyan: ssj.tex,
+    ultra: ultra.tex,
     glow,
+    emissive,
     dispose: () => {
-      figure.dispose();
+      forms.forEach((f) => f.tex.dispose());
       glow.dispose();
+      emissive.dispose();
     },
   };
 }
@@ -223,8 +242,7 @@ export async function buildImageFigure(
   const u = ultra ? frameImage(ultra, width) : undefined;
   const glow = glowFrom(b.alpha, s?.alpha ?? b.alpha, width, height);
   return {
-    mode: "image",
-    figure: b.tex,
+    base: b.tex,
     superSaiyan: s?.tex,
     ultra: u?.tex,
     glow,

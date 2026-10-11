@@ -269,15 +269,27 @@ html:not(.js) .chapter-copy {
   animation: fb-aura 0.9s ease-in-out infinite alternate;
 }
 .fb-rim {
-  filter: drop-shadow(
-    0 0 calc(2px + var(--fx-sil) * 6px)
-      color-mix(
-        in oklab,
-        color-mix(in oklab, var(--ki), var(--gold) calc(var(--fx-gold) * 100%)),
-        var(--silver) calc(var(--fx-ultra) * 100%)
-      )
-  );
+  /* dim in the storm, lit by the aura, with a rim glow in the aura's colour */
+  filter: brightness(calc(0.42 + var(--fx-sil) * 0.4 + var(--fx-aura) * 0.35))
+    drop-shadow(
+      0 0 calc(2px + var(--fx-sil) * 6px)
+        color-mix(
+          in oklab,
+          color-mix(in oklab, var(--ki), var(--gold) calc(var(--fx-gold) * 100%)),
+          var(--silver) calc(var(--fx-ultra) * 100%)
+        )
+    );
 }
+.fb-form-base {
+  opacity: calc((1 - var(--fx-ssj)) * (1 - var(--fx-ultra)));
+}
+.fb-form-ssj {
+  opacity: var(--fx-ssj);
+}
+.fb-form-ultra {
+  opacity: calc(var(--fx-ultra) * (1 - var(--fx-ssj)));
+}
+/* supplied artwork: base and golden cut-outs crossfade */
 .fb-hair-ssj {
   opacity: var(--fx-ssj);
 }

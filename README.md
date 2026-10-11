@@ -7,8 +7,9 @@ The page plays like an anime trailer: an opening title card, then one continuous
 scrubs with the scroll wheel. Scrolling forward advances the film and scrolling back rewinds every layer.
 
 > **Rights notice.** Dragon Ball and Son Goku are © Bird Studio / Shueisha and Toei Animation. This repository
-> ships **no official artwork, footage or models**. Out of the box, everything on screen is generated in code: an
-> original procedural silhouette, GLSL effects and a Web Audio soundscape. You can drop in media you own or are
+> ships **no official artwork, footage or models**. Out of the box, Goku is a code-drawn, cel-shaded fan
+> illustration (vector paths in `src/lib/goku-figure.ts`), and every effect and sound is generated in code: GLSL
+> shaders and a Web Audio soundscape. For pixel-exact official art, drop in media you own or are
 > licensed to use (see [Supplying your own media](#supplying-your-own-media)). Don't deploy official assets
 > publicly without permission.
 
@@ -17,7 +18,7 @@ scrubs with the scroll wheel. Scrolling forward advances the film and scrolling 
 | Chapter | Scroll | What happens |
 | --- | --- | --- |
 | **00 Prologue** | 1.1 screens | Full-screen opening (your film, or the live 3D storm), with the title "THE POWER WITHIN." revealed character by character as the camera pushes in. |
-| **01 Awakening** | 2 | A storm-lit battlefield: the camera pushes toward the silhouette, smoke drifts past the lens, lightning lights the clouds, and the rim light slowly finds the figure. |
+| **01 Awakening** | 2 | A storm-lit battlefield: the camera pushes toward Goku, smoke drifts past the lens, lightning lights the clouds, and the rim light slowly finds the figure. |
 | **02 Energy** | 2 | The world darkens, ki particles spiral inward, the cracks in the ground glow blue, rocks begin to levitate, arcs crawl over the body, and the camera starts to shake. |
 | **03 Transformation** | 3.2 | The climax. The aura stutters from blue to gold behind letterbox bars, then a flash. The hair regrows into upswept golden spikes, a shockwave rolls out, the ground fractures, rocks rise, and the camera pulls back to show the scale. |
 | **04 Ultra Instinct** | 2.4 | Gold dissolves into a silent silver-blue void: the ground falls away, stars and nebulae appear, light trails orbit the figure, and the camera slowly circles. |
@@ -52,8 +53,8 @@ causes a request, a 404 or a broken layout. **After adding or removing a file, r
 | `public/images/goku-intro-poster.webp` | First frame shown while the film buffers | No poster |
 | `public/videos/goku-intro.vtt` | Captions / sound descriptions for the film's audio | No track |
 | `public/videos/goku-transformation.mp4` (+ `.webm`) | Clip scrubbed by scroll over the chapter 03 burst | Procedural transformation |
-| `public/models/goku.glb` | Rigged 3D character (takes priority over images) | Images, then the procedural figure |
-| `public/images/goku-base.webp` | Base-form cut-out | Procedural silhouette |
+| `public/models/goku.glb` | Rigged 3D character (takes priority over images) | Images, then the drawn Goku |
+| `public/images/goku-base.webp` | Base-form cut-out | Drawn Goku |
 | `public/images/goku-super-saiyan.webp` | Golden-form cut-out | Base image, regrown with the golden wipe |
 | `public/images/goku-ultra-instinct.webp` | Ultra Instinct cut-out | Base image, tinted silver |
 | `public/images/battlefield.webp` | Painted panorama behind chapters 00–03 | Procedural storm sky |
@@ -106,9 +107,9 @@ art should be clean and un-glowed.
 - Meshes or materials whose name contains `hair` shift to gold, then silver, with each form.
 - Uncompressed and **Meshopt**-compressed files load (`npx @gltf-transform/cli optimize in.glb public/models/goku.glb --compress meshopt`).
   Draco is not enabled.
-- If the file fails to load, the procedural figure takes over and a warning is logged.
+- If the file fails to load, the drawn Goku takes over and a warning is logged.
 
-The aura behind a model is shaped by the procedural silhouette, which fits most humanoid proportions.
+The aura behind a model is shaped by the drawn figure's silhouette, which fits most humanoid proportions.
 
 ### Backdrops
 
@@ -125,7 +126,7 @@ src/
                           smoke, shockwave, light trails, tunnel, camera rig, post-processing
   hooks/                  use-cinematic-scroll (the master timeline), Lenis, media queries
   lib/                    assets, scene-config, story-copy, animation-config, quality tiers,
-                          director (shared shot state), storm, Web Audio engine, procedural figure
+                          director (shared shot state), storm, Web Audio engine, drawn Goku figure
 ```
 
 - **One master timeline.** `hooks/use-cinematic-scroll.ts` pins the stage for the whole story and builds a
@@ -138,9 +139,11 @@ src/
 - **Frame-locked rendering.** The canvas uses `frameloop="never"` and is advanced from GSAP's ticker right after
   the timeline updates, so copy and 3D never drift apart. It stops rendering when off-screen or fully covered.
 - **Lenis + ScrollTrigger** share GSAP's ticker. Touch devices keep native scrolling.
-- **Procedural character.** `lib/warrior-figure.ts` is SVG path data for an original silhouette with separate
-  base and golden hair layers. It is rasterised into packed mask and blur textures, which drive the rim light, the
-  hair regrowth and the flame-shaped aura shader. The same paths render the CSS fallback.
+- **Drawn character.** `lib/goku-figure.ts` draws Goku as cel-shaded vector art: gi, undershirt, sash,
+  wristbands, boots and the 悟 badge are shared, while hair, eyes and brows exist per form (black, Super Saiyan
+  gold with teal eyes, Ultra Instinct silver). Each form is rasterised into a colour texture, with a mask of the
+  visible hair (so gold and silver hair can glow) and blurred silhouettes for the rim light and the flame aura.
+  The golden form regrows from the scalp up behind a bright front. The same paths render the CSS fallback.
 - **Fallbacks.** The CSS/SVG scene (`components/cinematic/fallback-scene.tsx`) paints instantly and reads the
   same director values through CSS variables, so it is also a complete simplified experience when WebGL is
   unavailable. WebGL errors and context loss fall back to it automatically.

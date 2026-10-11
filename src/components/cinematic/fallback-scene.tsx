@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { ASSET_PATHS, type AssetManifest } from "@/lib/assets";
 import { director, INITIAL_SHOT } from "@/lib/director";
 import { mulberry32 } from "@/lib/random";
-import { WARRIOR } from "@/lib/warrior-figure";
+import { FIGURE_BODY, figureParts, type Form, type Shape } from "@/lib/goku-figure";
 
 /**
  * The CSS + SVG version of the film. It paints instantly (before Three.js has
@@ -95,30 +95,7 @@ export function FallbackScene({ assets, active }: { assets: AssetManifest; activ
             ) : null}
           </>
         ) : (
-          <svg viewBox="0 0 1000 1500" className="fb-rim">
-            <defs>
-              <linearGradient id="fb-ssj" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0" stopColor="#ff9a1a" />
-                <stop offset="0.5" stopColor="#ffd040" />
-                <stop offset="1" stopColor="#fff6c8" />
-              </linearGradient>
-            </defs>
-            <g fill="#06070b">
-              {WARRIOR.body.map((d, i) => (
-                <path key={i} d={d} />
-              ))}
-            </g>
-            <g className="fb-hair-base" fill="#06070b">
-              {WARRIOR.hairBase.map((d, i) => (
-                <path key={i} d={d} />
-              ))}
-            </g>
-            <g className="fb-hair-ssj" fill="url(#fb-ssj)">
-              {WARRIOR.hairSsj.map((d, i) => (
-                <path key={i} d={d} />
-              ))}
-            </g>
-          </svg>
+          <GokuSvg />
         )}
       </div>
       <div className="stage-layer fb-embers">
@@ -152,4 +129,53 @@ function crackPaths() {
     paths.push(d);
   }
   return paths;
+}
+
+/** Renders figure layers as SVG; clip paths get ids unique to this layer group. */
+function Shapes({ shapes, id }: { shapes: Shape[]; id: string }) {
+  return (
+    <>
+      {shapes.map((s, i) => {
+        const clipId = s.clip ? `${id}-${i}` : undefined;
+        return (
+          <g key={i} clipPath={clipId ? `url(#${clipId})` : undefined} opacity={s.opacity}>
+            {clipId ? (
+              <clipPath id={clipId}>
+                <path d={s.clip} />
+              </clipPath>
+            ) : null}
+            <path
+              d={s.d}
+              fill={s.fill ?? "none"}
+              stroke={s.stroke}
+              strokeWidth={s.width}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </g>
+        );
+      })}
+    </>
+  );
+}
+
+const FORMS: Form[] = ["base", "ssj", "ultra"];
+
+/** The drawn Goku with all three forms stacked; CSS crossfades them. */
+function GokuSvg() {
+  return (
+    <svg viewBox="0 0 1000 1500" className="fb-rim">
+      {FORMS.map((form) => (
+        <g key={form} className={`fb-form-${form}`}>
+          <Shapes shapes={figureParts(form).back} id={`fb-${form}-back`} />
+        </g>
+      ))}
+      <Shapes shapes={FIGURE_BODY} id="fb-body" />
+      {FORMS.map((form) => (
+        <g key={form} className={`fb-form-${form}`}>
+          <Shapes shapes={[...figureParts(form).face, ...figureParts(form).front]} id={`fb-${form}-front`} />
+        </g>
+      ))}
+    </svg>
+  );
 }

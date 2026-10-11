@@ -30,7 +30,7 @@ const has = (name: string, needle: string) => name.toLowerCase().includes(needle
  * - a clip matching `transformClip` is scrubbed by the transformation's progress;
  * - meshes/materials matching `hairMatch` shift colour with each form.
  * Meshopt-compressed files are supported. If loading fails, `onError` lets
- * the scene fall back to the procedural figure.
+ * the scene fall back to the drawn figure.
  */
 export function WarriorModel({ onError }: { onError: () => void }) {
   const group = useRef<THREE.Group>(null);
@@ -99,7 +99,7 @@ export function WarriorModel({ onError }: { onError: () => void }) {
         },
       };
     })().catch((error) => {
-      console.warn("[goku] character model failed to load, using the procedural figure instead.", error);
+      console.warn("[goku] character model failed to load, using the drawn figure instead.", error);
       if (!cancelled) onError();
     });
     return () => {

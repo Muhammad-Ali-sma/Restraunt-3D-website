@@ -5,10 +5,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { ASSET_PATHS, type AssetManifest } from "@/lib/assets";
 import { director } from "@/lib/director";
-import { FIGURE_GROUND_Y, FIGURE_SIZE } from "@/lib/warrior-figure";
+import { FIGURE_GROUND_Y, FIGURE_SIZE } from "@/lib/goku-figure";
 import { NOISE, OUTPUT, SHARED } from "./shaders";
 import { shared } from "./shared-uniforms";
-import { buildImageFigure, buildProceduralFigure, type FigureTextures } from "./warrior-textures";
+import { buildIllustratedFigure, buildImageFigure, type FigureTextures } from "./warrior-textures";
 
 /** World units per figure unit: skull-to-sole (1020 units) stands 2.25 tall. */
 const K = 2.25 / 1020;
@@ -26,58 +26,43 @@ const FIGURE_FRAG = /* glsl */ `
   uniform sampler2D uSsjTex;
   uniform sampler2D uUltraTex;
   uniform sampler2D uGlow;
-  uniform float uSsj, uUltra, uAura, uSil, uImage, uHasSsj, uHasUltra;
+  uniform sampler2D uEmissive;
+  uniform float uSsj, uUltra, uAura, uSil, uHasEmissive;
   varying vec2 vUv;
 
   void main() {
     vec4 g = texture2D(uGlow, vUv);
-    // The golden hair regrows from the scalp upwards, behind a bright front.
+    // The golden form regrows from the scalp upwards, behind a bright front.
     float hy = clamp((vUv.y - 0.6) / 0.3, 0.0, 1.0);
     float wobble = snoise(vec2(vUv.x * 16.0, uTime * 0.6)) * 0.06;
     float front = uSsj * 1.25;
     float grown = smoothstep(hy + wobble - 0.04, hy + wobble + 0.04, front);
     float frontLine = exp(-pow((hy + wobble - front) * 16.0, 2.0)) * step(0.01, uSsj) * step(uSsj, 0.99);
 
-    vec3 dark = vec3(0.006, 0.007, 0.011);
+    vec4 c = mix(texture2D(uFig, vUv), texture2D(uSsjTex, vUv), grown);
+    c = mix(c, texture2D(uUltraTex, vUv), uUltra);
+    float alpha = c.a;
+    if (alpha < 0.01) discard;
+
+    // Grade the drawing into the shot: dim and cool in the storm, lit by the aura.
+    float light = 0.22 + uSil * 0.46 + uAura * 0.22;
+    vec3 col = c.rgb * light;
+    float luma = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(vec3(luma) * vec3(0.78, 0.88, 1.15), col, clamp(0.4 + uSil * 0.35 + uAura * 0.45, 0.0, 1.0));
+    col += uAuraColor * uAura * 0.05;
+
+    // Rim light from the aura (and the lightning) along the silhouette.
     float tight = mix(g.r, g.g, uSsj);
-    vec3 rimLight = uAuraColor * (0.25 + uAura * 3.4) * uSil + vec3(0.55, 0.65, 1.0) * uStrike * 1.4;
-    vec3 col;
-    float alpha;
+    float rim = clamp((alpha - tight) * 2.6, 0.0, 1.0);
+    col += (uAuraColor * (0.25 + uAura * 3.0) * uSil + vec3(0.55, 0.65, 1.0) * uStrike * 1.4) * rim * 0.8;
 
-    if (uImage < 0.5) {
-      vec4 f = texture2D(uFig, vUv);
-      float body = f.r;
-      float baseHair = f.g * (1.0 - grown);
-      float ssjHair = f.b * grown;
-      float hair = max(baseHair, ssjHair);
-      alpha = max(body, hair);
-      if (alpha < 0.01) discard;
-
-      float rim = clamp((alpha - tight) * 2.6, 0.0, 1.0);
-      vec3 bodyCol = dark + uAuraColor * uAura * 0.035 + f.a * uAuraColor * (0.04 + uAura * 0.55) * uSil;
-      // Ultra Instinct leaves the hair silver; the golden form makes it shine.
-      vec3 baseHairCol = mix(dark, vec3(0.42, 0.46, 0.62), uUltra * 0.9);
-      // Cel-shaded gold: deep at the roots, pale at the tips, a hot rim along each spike.
-      vec3 ssjCol = mix(vec3(0.9, 0.34, 0.02), vec3(1.0, 0.74, 0.18), smoothstep(0.1, 0.9, hy)) * (0.62 + uAura * 0.2);
-      ssjCol += vec3(1.0, 0.8, 0.35) * clamp((f.b - tight) * 3.0, 0.0, 1.0) * 0.35;
-      vec3 hairCol = mix(baseHairCol, ssjCol, ssjHair / max(hair, 0.001));
-      col = mix(bodyCol, hairCol, hair);
-      col += rimLight * rim;
-      col += vec3(1.0, 0.9, 0.6) * frontLine * hair * 6.0;
-    } else {
-      vec4 base = texture2D(uFig, vUv);
-      vec4 ssj = uHasSsj > 0.5 ? texture2D(uSsjTex, vUv) : base;
-      vec4 ultra = uHasUltra > 0.5 ? texture2D(uUltraTex, vUv) : base;
-      vec4 c = mix(base, ssj, grown);
-      c = mix(c, ultra, uUltra);
-      alpha = c.a;
-      if (alpha < 0.01) discard;
-      float rim = clamp((alpha - tight) * 2.6, 0.0, 1.0);
-      // Grade the artwork into the scene: darken with the storm, light it with the aura.
-      col = c.rgb * (0.35 + uSil * 0.45 + uAura * 0.5) + uAuraColor * uAura * 0.08;
-      col += rimLight * rim * 0.8;
-      col += vec3(1.0, 0.9, 0.6) * frontLine * alpha * 3.0;
-    }
+    // Golden and silver hair glow from within.
+    vec2 e = uHasEmissive > 0.5 ? texture2D(uEmissive, vUv).rg : vec2(0.0);
+    float goldHair = e.r * grown * (1.0 - uUltra);
+    col = mix(col, col * vec3(1.0, 0.74, 0.3), goldHair * 0.5);
+    col += vec3(1.0, 0.6, 0.08) * goldHair * (0.06 + uAura * 0.16);
+    col += vec3(0.75, 0.82, 1.0) * e.g * uUltra * (0.1 + uAura * 0.35);
+    col += vec3(1.0, 0.9, 0.6) * frontLine * (uHasEmissive > 0.5 ? e.r : alpha) * 4.0;
 
     col *= uExposure;
     gl_FragColor = vec4(col, alpha);
@@ -118,14 +103,14 @@ const AURA_FRAG = /* glsl */ `
     vec3 edgeCol = mix(uAuraColor, vec3(0.45, 0.4, 1.0), calm * 0.6);
     float golden = uSsj * (1.0 - calm);
     vec3 col = edgeCol * outer * mix(1.4, 1.15, golden);
-    col += mix(uAuraColor, vec3(1.0), mix(0.65, 0.22, golden)) * inner * mix(2.1, 1.3, golden);
+    col += mix(uAuraColor, mix(vec3(1.0), vec3(1.0, 0.78, 0.35), golden), mix(0.65, 0.3, golden)) * inner * mix(2.1, 1.05, golden);
     col += mix(uAuraColor, vec3(1.0), 0.5) * wisps * calm * 1.6;
 
     // a soft bloom of light around the body that lights the air
     float halo = exp(-length((uv - vec2(0.5, 0.56)) * vec2(1.8, 1.0)) * 3.2);
     col += uAuraColor * halo * (0.25 + uGather * 0.25);
 
-    col *= uAura * uExposure * mix(1.0, 0.72, golden);
+    col *= uAura * uExposure * mix(1.0, 0.62, golden);
     gl_FragColor = vec4(col, 1.0);
     ${OUTPUT}
   }
@@ -141,8 +126,8 @@ type Props = {
 };
 
 /**
- * The character: a camera-facing figure (procedural silhouette or supplied
- * artwork) with rim light from its own aura, and the flame-like aura behind it.
+ * The character: a camera-facing figure (the drawn Goku, or supplied artwork)
+ * graded by the scene and rim-lit by its own aura, with the flame aura behind.
  */
 export function Warrior({ assets, textureSize, showFigure = true, onReady }: Props) {
   const group = useRef<THREE.Group>(null);
@@ -165,9 +150,9 @@ export function Warrior({ assets, textureSize, showFigure = true, onReady }: Pro
         ultra: assets.characterUltraInstinct ? ASSET_PATHS.characterUltraInstinct : undefined,
       })
         .then(done)
-        .catch(() => !cancelled && done(buildProceduralFigure(textureSize)));
+        .catch(() => !cancelled && done(buildIllustratedFigure(textureSize)));
     } else {
-      done(buildProceduralFigure(textureSize));
+      done(buildIllustratedFigure(textureSize));
     }
     return () => {
       cancelled = true;
@@ -212,17 +197,16 @@ function FigureMeshes({ textures, showFigure }: { textures: FigureTextures; show
       depthWrite: false,
       uniforms: {
         ...shared,
-        uFig: { value: textures.figure },
-        uSsjTex: { value: textures.superSaiyan ?? textures.figure },
-        uUltraTex: { value: textures.ultra ?? textures.figure },
+        uFig: { value: textures.base },
+        uSsjTex: { value: textures.superSaiyan ?? textures.base },
+        uUltraTex: { value: textures.ultra ?? textures.base },
         uGlow: { value: textures.glow },
+        uEmissive: { value: textures.emissive ?? null },
+        uHasEmissive: { value: textures.emissive ? 1 : 0 },
         uSsj: { value: 0 },
         uUltra: { value: 0 },
         uAura: { value: 0 },
         uSil: { value: 0 },
-        uImage: { value: textures.mode === "image" ? 1 : 0 },
-        uHasSsj: { value: textures.superSaiyan ? 1 : 0 },
-        uHasUltra: { value: textures.ultra ? 1 : 0 },
       },
       vertexShader: /* glsl */ `
         varying vec2 vUv;
