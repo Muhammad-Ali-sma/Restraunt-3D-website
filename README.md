@@ -61,7 +61,28 @@ node scripts/film/render.mjs   # re-render the hero film (needs Playwright + ffm
 scripts/subset-jp-font.sh      # rebuild the Japanese font subset after editing copy
 ```
 
-Set `NEXT_PUBLIC_SITE_URL` in production so Open Graph URLs resolve correctly.
+## Deploy to Vercel
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FMuhammad-Ali-sma%2FRestraunt-3D-website)
+
+1. Go to [vercel.com/new](https://vercel.com/new), import `Muhammad-Ali-sma/Restraunt-3D-website`, and keep the
+   detected settings. The framework preset is **Next.js**, the build command is `next build`, and no environment
+   variables are required.
+2. Under **Settings → Git**, set the **Production Branch** to whichever branch should be live, for example `main`
+   after merging. Every other branch and pull request gets its own preview URL automatically.
+3. *(Optional)* After attaching a custom domain, set `NEXT_PUBLIC_SITE_URL` to it (see `.env.example`). Until then,
+   Open Graph URLs use the project's `*.vercel.app` production domain via `VERCEL_PROJECT_PRODUCTION_URL`.
+
+What's already configured:
+
+- **Rendering:** the page is fully static, and the only server code is the reservation Server Action, which runs as
+  a Vercel Function.
+- **Node version:** `engines.node` is set to `>=20.9.0`, matching Next.js 16's minimum, so Vercel uses a supported
+  version.
+- **Caching:** `/_next/static` assets are content-hashed and cached for a year by default. The hero film and poster
+  in `/media` are cached for a week, then revalidated in the background.
+- **Security headers:** `X-Content-Type-Options`, `Referrer-Policy` and `Permissions-Policy` are set, and the
+  `X-Powered-By` header is removed.
 
 ## Credits
 

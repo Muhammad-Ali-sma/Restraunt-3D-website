@@ -28,7 +28,11 @@ const notoJp = localFont({
   display: "swap",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+// Canonical origin for Open Graph/Twitter URLs. On Vercel this resolves
+// automatically from its system env vars; set NEXT_PUBLIC_SITE_URL to override
+// (e.g. once a custom domain is attached).
+const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL;
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? (vercelHost ? `https://${vercelHost}` : "http://localhost:3000");
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

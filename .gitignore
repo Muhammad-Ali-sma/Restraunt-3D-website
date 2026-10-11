@@ -42,3 +42,5 @@ next-env.d.ts
 
 # film renderer scratch frames
 /.film-frames/
+
+!.env.example
