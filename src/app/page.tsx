@@ -1,25 +1,9 @@
-import { Chef } from "@/components/sections/Chef";
-import { Course } from "@/components/sections/Course";
-import { Evening } from "@/components/sections/Evening";
-import { Footer } from "@/components/sections/Footer";
-import { Hero } from "@/components/sections/Hero";
-import { Nav } from "@/components/sections/Nav";
-import { Reserve } from "@/components/sections/Reserve";
-import { Story } from "@/components/sections/Story";
+import { Experience } from "@/components/cinematic/experience";
+import { getAssetManifest } from "@/lib/asset-manifest";
 
 export default function Home() {
-  return (
-    <>
-      <Nav />
-      <main>
-        <Hero />
-        <Story />
-        <Course />
-        <Evening />
-        <Chef />
-        <Reserve />
-      </main>
-      <Footer />
-    </>
-  );
+  // Resolved while prerendering, so the client never requests media that
+  // isn't there. See lib/assets.ts for the paths.
+  const assets = getAssetManifest();
+  return <Experience assets={assets} />;
 }
