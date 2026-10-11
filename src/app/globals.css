@@ -1,0 +1,166 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #0b0a09;
+  --ink-2: #141210;
+  --ink-3: #1d1a17;
+  --paper: #efe8dc;
+  --paper-dim: #a69d8f;
+  --gold: #c9a35b;
+  --gold-soft: #e8c37a;
+  --vermilion: #c2412d;
+  --line: rgb(239 232 220 / 0.12);
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-paper: var(--paper);
+  --color-paper-dim: var(--paper-dim);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-vermilion: var(--vermilion);
+  --color-line: var(--line);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bodoni), "Times New Roman", serif;
+  --font-jp: var(--font-noto-jp), "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html {
+  background: var(--ink);
+  color: var(--paper);
+  color-scheme: dark;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--ink);
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 4px;
+}
+
+/* Lenis */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+/* Film grain overlay — a tiny SVG noise tile, composited once by the GPU */
+.grain {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- Intro film: a "portal" that opens from the centre ---------- */
+@property --hole {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
+.intro {
+  --hole: 0%;
+  mask-image: radial-gradient(circle at 50% 55%, transparent calc(var(--hole) - 8%), #000 var(--hole));
+  transition: --hole 1.5s var(--ease-out-expo);
+}
+.intro[data-phase="reveal"] {
+  --hole: 130%;
+}
+.intro[data-phase="live"] {
+  display: none;
+}
+html[data-intro="skip"] .intro {
+  display: none;
+}
+
+.intro-line {
+  opacity: 0;
+  transform: translateY(14px);
+  filter: blur(8px);
+  animation: intro-line 1.6s var(--ease-out-expo) forwards;
+}
+@keyframes intro-line {
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+/* ---------- Hero title: the film plays inside the letters ---------- */
+.film-title {
+  isolation: isolate;
+}
+.film-title h1 {
+  background: var(--ink);
+  color: #fff;
+  mix-blend-mode: multiply;
+}
+.film-title video {
+  filter: saturate(1.1) brightness(1.35);
+}
+
+/* ---------- Scroll reveals (only hide content when JS is running) ---------- */
+html.js [data-reveal] {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 1.1s var(--ease-out-expo),
+    transform 1.1s var(--ease-out-expo);
+  transition-delay: var(--d, 0ms);
+}
+html.js [data-reveal].is-in {
+  opacity: 1;
+  transform: none;
+}
+
+.hairline {
+  background: linear-gradient(90deg, transparent, var(--line) 15%, var(--line) 85%, transparent);
+  height: 1px;
+}
+
+.marquee {
+  animation: marquee 38s linear infinite;
+}
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  html.js [data-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+}

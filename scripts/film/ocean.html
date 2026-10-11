@@ -1,0 +1,195 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Kuroshio film renderer</title>
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// Deterministic renderer for the hero film. `window.renderFrame(t)` draws one
+// frame at time t (seconds); scripts/film/render.mjs captures the frames and
+// ffmpeg encodes them. Everything here is original procedural shading.
+const params = new URLSearchParams(location.search);
+const W = +(params.get("w") || 1280);
+const H = +(params.get("h") || 720);
+const DURATION = +(params.get("d") || 6);
+
+const canvas = document.getElementById("c");
+canvas.width = W;
+canvas.height = H;
+const gl = canvas.getContext("webgl", { preserveDrawingBuffer: true, antialias: false });
+
+const vert = `attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }`;
+const frag = `
+precision highp float;
+uniform vec2 uRes;
+uniform float uTime;
+uniform float uProg; // 0..1 over the film
+
+const int OCT_TRACE = 4;
+const int OCT_NORMAL = 7;
+
+mat2 rot(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+
+float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3. - 2. * f);
+  return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y) * 2. - 1.;
+}
+
+// Directional sharp-crested waves. Most travel toward the camera (+z
+// towards -z) so the crests read as horizontal swells on screen; a noise warp
+// breaks up the regularity. Each octave gets a new heading and frequency.
+float ocean(vec2 p, int octaves){
+  float h = 0., amp = .32, freq = .75, ang = 0.;
+  vec2 warp = vec2(vnoise(p * .18), vnoise(p * .18 + 17.)) * 1.2;
+  for (int i = 0; i < 12; i++) {
+    if (i >= octaves) break;
+    vec2 dir = vec2(sin(ang), -cos(ang));
+    float phase = dot(dir, p + warp) * freq + uTime * sqrt(9.8 * freq) * 1.1;
+    h += amp * (exp(sin(phase) - 1.) * 1.6 - .5);
+    ang += 1.37 * (mod(float(i), 2.) * 2. - 1.) + .23 * float(i);
+    ang = clamp(ang, -1.1, 1.1);
+    freq *= 1.55;
+    amp *= .62;
+  }
+  return h;
+}
+
+float trace(vec3 ro, vec3 rd, out vec3 hit){
+  float tm = 0., tx = 120.;
+  vec3 far = ro + rd * tx;
+  float hx = far.y - ocean(far.xz, OCT_TRACE);
+  if (hx > 0.) { hit = far; return tx; }
+  float hm = ro.y - ocean(ro.xz, OCT_TRACE);
+  float tmid = 0.;
+  for (int i = 0; i < 14; i++) {
+    tmid = mix(tm, tx, hm / (hm - hx));
+    hit = ro + rd * tmid;
+    float hmid = hit.y - ocean(hit.xz, OCT_TRACE);
+    if (hmid < 0.) { tx = tmid; hx = hmid; } else { tm = tmid; hm = hmid; }
+  }
+  return tmid;
+}
+
+vec3 normalAt(vec3 p, float eps){
+  vec3 n;
+  float h = ocean(p.xz, OCT_NORMAL);
+  n.x = h - ocean(vec2(p.x + eps, p.z), OCT_NORMAL);
+  n.z = h - ocean(vec2(p.x, p.z + eps), OCT_NORMAL);
+  n.y = eps;
+  return normalize(n);
+}
+
+const vec3 MOON_DIR = normalize(vec3(0.34, 0.075, 1.));
+const vec3 MOON_COL = vec3(1.0, .86, .62);   // warm gold moonlight (brand accent)
+const vec3 SKY_TOP = vec3(.006, .009, .016);
+const vec3 SKY_HZN = vec3(.085, .1, .12);
+const vec3 DEEP = vec3(.0, .018, .028);
+const vec3 SHALLOW = vec3(.07, .19, .2);
+
+vec3 sky(vec3 rd){
+  float y = max(rd.y, 0.);
+  vec3 c = mix(SKY_HZN, SKY_TOP, pow(y, .3));
+  float m = max(dot(rd, MOON_DIR), 0.);
+  c += MOON_COL * (smoothstep(.99975, .9999, m) * 5. + pow(m, 260.) * .35 + pow(m, 14.) * .06);
+  c += MOON_COL * .05 * exp(-y * 9.) * pow(max(dot(normalize(rd.xz), normalize(MOON_DIR.xz)), 0.), 6.);
+  // thin drifting cloud bands catching moonlight
+  float cl = vnoise(rd.xz / (rd.y + .08) * 1.6 + vec2(uTime * .03, 0.)) * .5 + .5;
+  cl = smoothstep(.55, .95, cl) * smoothstep(.0, .25, rd.y) * (1. - smoothstep(.3, .7, rd.y));
+  c = mix(c, MOON_COL * .07 + SKY_HZN, cl * .32);
+  return c;
+}
+
+vec3 seaColor(vec3 p, vec3 n, vec3 rd, vec3 eye){
+  float fres = clamp(1. - dot(n, -rd), 0., 1.);
+  fres = pow(fres, 2.6) * .8;
+  vec3 refl = sky(reflect(rd, n));
+  float diff = pow(dot(n, MOON_DIR) * .4 + .6, 60.);
+  vec3 refr = DEEP + diff * SHALLOW * .45;
+  vec3 c = mix(refr, refl, fres);
+  float atten = max(1. - dot(p - eye, p - eye) * .0012, 0.);
+  c += SHALLOW * max(p.y - .5, 0.) * .32 * atten;
+  c += MOON_COL * .03 * pow(1. - abs(n.y), 2.) * atten; // crest rim light
+  // moon glitter path
+  float spec = pow(max(dot(reflect(rd, n), MOON_DIR), 0.), 160.);
+  float dist = length(p - eye);
+  c += MOON_COL * spec * 3. * smoothstep(70., 25., dist);
+  float sheen = pow(max(dot(reflect(rd, n), MOON_DIR), 0.), 10.);
+  c += MOON_COL * sheen * .22 * atten;
+  return c;
+}
+
+vec3 aces(vec3 x){ return clamp((x * (2.51 * x + .03)) / (x * (2.43 * x + .59) + .14), 0., 1.); }
+
+void main(){
+  vec2 uv = (gl_FragCoord.xy * 2. - uRes) / uRes.y;
+  float e = smoothstep(0., 1., uProg);
+  // slow dolly forward + gentle rise and roll: a calm, cinematic move
+  vec3 ro = vec3(0., 3.1 + e * 1.1, uTime * 2.4);
+  float yaw = .05 + sin(uTime * .35) * .03;
+  float pitch = -.11 - e * .05;
+  float roll = sin(uTime * .5) * .018;
+  vec3 rd = normalize(vec3(uv * rot(roll), 1.85));
+  rd.yz *= rot(pitch);
+  rd.xz *= rot(yaw);
+
+  vec3 col;
+  vec3 hit;
+  if (rd.y > .02) {
+    col = sky(rd);
+  } else {
+    float t = trace(ro, rd, hit);
+    vec3 n = normalAt(hit, .0015 * t + .01);
+    col = seaColor(hit, n, rd, ro);
+    float fog = 1. - exp(-t * .022);
+    col = mix(col, sky(vec3(rd.x, 0.02, rd.z)), fog);
+    col = mix(col, sky(rd), smoothstep(-.02, .02, rd.y));
+  }
+
+  // grade: teal shadows, warm highlights, soft vignette
+  col = aces(col * 1.75);
+  col = pow(col, vec3(.88));
+  float v = smoothstep(1.75, .45, length(uv * vec2(.82, 1.)));
+  col *= mix(.38, 1., v);
+  gl_FragColor = vec4(col, 1.);
+}`;
+
+function compile(type, src){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, vert));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, frag));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(prog, "p");
+gl.enableVertexAttribArray(loc);
+gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+const uRes = gl.getUniformLocation(prog, "uRes");
+const uTime = gl.getUniformLocation(prog, "uTime");
+const uProg = gl.getUniformLocation(prog, "uProg");
+gl.viewport(0, 0, W, H);
+
+window.renderFrame = (t) => {
+  gl.uniform2f(uRes, W, H);
+  gl.uniform1f(uTime, t);
+  gl.uniform1f(uProg, Math.min(t / DURATION, 1));
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.finish();
+  return canvas.toDataURL("image/png");
+};
+window.ready = true;
+</script>
+</body>
+</html>
