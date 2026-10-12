@@ -92,8 +92,6 @@ export const director = {
   strikeX: 0,
   /** One-off push-in played with the title on load (time-based, not scroll). */
   introPush: 0,
-  /** Overall story progress, 0–1 across the pinned stage. */
-  progress: 0,
 };
 
 export function resetShot() {

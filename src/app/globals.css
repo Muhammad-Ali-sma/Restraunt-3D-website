@@ -2,12 +2,10 @@
 
 :root {
   --ink: #05060a;
-  --ink-2: #0b0d14;
   --bone: #eef1f7;
   --dim: #a3abbd;
   --ki: #7fc8ff;
   --gold: #ffc531;
-  --gold-deep: #c98a12;
   --ember: #ff7a1a;
   --silver: #cfd9ff;
   --line: rgb(238 241 247 / 0.16);
@@ -15,19 +13,16 @@
 
 @theme inline {
   --color-ink: var(--ink);
-  --color-ink-2: var(--ink-2);
   --color-bone: var(--bone);
   --color-dim: var(--dim);
   --color-ki: var(--ki);
   --color-gold: var(--gold);
-  --color-gold-deep: var(--gold-deep);
   --color-ember: var(--ember);
   --color-silver: var(--silver);
   --color-line: var(--line);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-big-shoulders), "Arial Narrow", Impact, sans-serif;
   --font-jp: var(--font-noto-jp), "Hiragino Mincho ProN", "Yu Mincho", serif;
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html {

@@ -53,24 +53,12 @@ export const SCROLL_SCALE = { desktop: 1, mobile: 0.72 } as const;
 
 /** Colour script for the whole film. Hex values are sRGB. */
 export const PALETTE = {
-  ink: "#05060a",
-  storm: "#1a2233",
-  stormGlow: "#5f7da8",
+  /** Base-form ki: aura, sparks, cracks and rim light. */
   ki: "#7fc8ff",
-  kiCore: "#e8f6ff",
+  /** Super Saiyan gold. */
   gold: "#ffc531",
-  goldHot: "#fff1b0",
-  ember: "#ff7a1a",
+  /** Ultra Instinct silver. */
   silver: "#cfd9ff",
-  silverDeep: "#6f7dff",
-  cosmic: "#0a0d24",
-  white: "#ffffff",
-} as const;
-
-/** World-space framing used by the camera rig and scene layout. */
-export const WORLD = {
-  /** Height of the character, feet on y = 0. */
-  figureHeight: 2.6,
-  /** Ground radius where rocks and cracks are placed. */
-  arena: 26,
+  /** Battlefield haze before the shaders take over. */
+  storm: "#1a2233",
 } as const;

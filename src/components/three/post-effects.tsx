@@ -19,7 +19,7 @@ export function Effects({ multisampling }: { multisampling: number }) {
 
   useFrame(() => {
     const s = director.shot;
-    if (bloom.current) bloom.current.intensity = 0.8 + s.aura * 0.25 + s.wave;
+    if (bloom.current) bloom.current.intensity = (0.8 + s.aura * 0.25 + s.wave) * s.bloom;
     if (aberration.current) {
       const k = 0.00045 + s.aberration * 0.0055;
       aberration.current.offset.set(k, k * 0.55);

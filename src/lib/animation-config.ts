@@ -33,9 +33,8 @@ export const ANIMATION = {
     decay: 5.5,
   },
 
+  /** Ease for the title and copy reveals; per-beat eases live in the timeline. */
   ease: {
-    cinematic: "power2.inOut",
     reveal: "expo.out",
-    impact: "power4.in",
   },
 } as const;

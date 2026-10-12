@@ -968,8 +968,3 @@ export const FIGURE_BODY = BODY;
 export function figureLayers(form: Form): Shape[] {
   return [...HAIR[form].back, ...BODY, ...FACE[form], ...HAIR[form].front];
 }
-
-/** Just the hair of a form (for glow masks), back and front. */
-export function hairLayers(form: Form): Shape[] {
-  return [...HAIR[form].back, ...HAIR[form].front];
-}

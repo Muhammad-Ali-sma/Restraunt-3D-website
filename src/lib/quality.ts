@@ -62,10 +62,6 @@ export function lowerTier(tier: QualityTier): QualityTier {
   return tier === "high" ? "medium" : "low";
 }
 
-export function isTouchDevice() {
-  return typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
-}
-
 /** True when WebGL can actually create a context (not just when the API exists). */
 export function supportsWebGL() {
   if (typeof window === "undefined") return false;

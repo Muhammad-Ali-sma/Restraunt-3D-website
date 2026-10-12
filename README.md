@@ -192,6 +192,9 @@ The page is fully static. On Vercel, import the repository and keep the detected
 `NEXT_PUBLIC_SITE_URL` (see `.env.example`) for Open Graph URLs on a custom domain. Supplied media in `/videos`,
 `/images` and `/models` is cached for a week, then revalidated in the background.
 
+The link-preview image is `src/app/opengraph-image.jpg`, a frame of chapter 02 with its alt text beside it in
+`opengraph-image.alt.txt`. Replace it with any 1200 × 630 image.
+
 ## Credits
 
 - Unofficial, non-commercial fan concept. Dragon Ball and Son Goku © Bird Studio / Shueisha, Toei Animation.

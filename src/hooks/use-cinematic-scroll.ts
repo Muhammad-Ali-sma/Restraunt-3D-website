@@ -97,7 +97,6 @@ export function useCinematicScroll({
           anticipatePin: 1,
           onUpdate(self) {
             const t = self.progress * STAGE_LENGTH;
-            director.progress = self.progress;
             story.setChapter(chapterAt(t));
             if (hasVideo) {
               const presence = Math.round(gsap.utils.clamp(0, 1, 1 - t / A) * 100) / 100;
